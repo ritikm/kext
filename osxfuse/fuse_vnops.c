@@ -797,6 +797,7 @@ fuse_vnop_getattr(struct vnop_getattr_args *ap)
     if (!(dataflags & FSESS_INITED) && !vnode_isvroot(vp)) {
         fdata_set_dead(data, false);
         err = ENOTCONN;
+        IOLog("osxfuse: Returning err: %d", err);
         return err;
     }
 
@@ -825,13 +826,32 @@ fuse_vnop_getattr(struct vnop_getattr_args *ap)
      * the vnode name cache.
      */
 
+    struct fuse_filehandle *fufh = NULL;
+    int type;
+    bool found_valid_fh = false;
+    for (type = 0; type < FUFH_MAXTYPE; type++) {
+        fufh = &(fvdat->fufh[type]);
+        if (FUFH_IS_VALID(fufh)) {
+            found_valid_fh = true;
+            IOLog("osxfuse: fufh(%llu) is valid\n", fufh->fh_id);
+            break;
+        }
+    }
+
     fdata_wait_init(data);
     fdisp_init_abi(&fdi, fuse_getattr_in, data);
     fdisp_make_vp(&fdi, FUSE_GETATTR, vp, context);
     fuse_abi_data_init(&fgi, DATOI(data), fdi.indata);
 
-    fuse_getattr_in_set_fh(&fgi, 0);
-    fuse_getattr_in_set_getattr_flags(&fgi, 0);
+    if (found_valid_fh) {
+        IOLog("osxfuse: setting flags to call fgetattr\n");
+        fuse_getattr_in_set_fh(&fgi, fufh->fh_id);
+        fuse_getattr_in_set_getattr_flags(&fgi, FUSE_GETATTR_FH);
+    } else {
+        IOLog("osxfuse: setting flags to call regular getattr\n");
+        fuse_getattr_in_set_fh(&fgi, 0);
+        fuse_getattr_in_set_getattr_flags(&fgi, 0);
+    }
 
     err = fdisp_wait_answ(&fdi);
     if (err) {
@@ -858,6 +878,7 @@ fuse_vnop_getattr(struct vnop_getattr_args *ap)
 
     if ((fuse_attr_get_mode(&fa) & S_IFMT) == 0) {
         fuse_ticket_release(fdi.tick);
+        IOLog("osxfuse: EIO because of bad va_mode\n");
         return EIO;
     }
 
@@ -915,6 +936,7 @@ fuse_vnop_getattr(struct vnop_getattr_args *ap)
 #if M_OSXFUSE_ENABLE_BIG_LOCK
             fuse_biglock_lock(data->biglock);
 #endif
+            IOLog("osxfuse: EIO because of stale vnode\n");
             return EIO;
         }
     }
@@ -2599,6 +2621,8 @@ FUSE_VNOP_EXPORT
 int
 fuse_vnop_read(struct vnop_read_args *ap)
 {
+    IOLog("osxfuse: Starting fuse_vnop_read\n");
+
     vnode_t       vp      = ap->a_vp;
     uio_t         uio     = ap->a_uio;
     int           ioflag  = ap->a_ioflag;
@@ -2625,18 +2649,22 @@ fuse_vnop_read(struct vnop_read_args *ap)
 
     fuse_trace_printf_vnop();
 
-    if (fuse_isdeadfs(vp)) {
+    if (fuse_isdeadfs(vp) && !vnode_isinuse(vp, 0)) {
         if (!vnode_ischr(vp)) {
+            IOLog("osxfuse: Returning ENXIO because !vnode_ischr\n");
             return ENXIO;
         } else {
+            IOLog("osxfuse: Return 0 [2]\n");
             return 0;
         }
     }
 
     if (!vnode_isreg(vp)) {
         if (vnode_isdir(vp)) {
+            IOLog("osxfuse: Return EISDIR [3]\n");
             return EISDIR;
         } else {
+            IOLog("osxfuse: Return EPERM [4]\n");
             return EPERM;
         }
     }
@@ -2649,16 +2677,19 @@ fuse_vnop_read(struct vnop_read_args *ap)
 
     orig_resid = uio_resid(uio);
     if (orig_resid == 0) {
+        IOLog("osxfuse: Return 0 [5]\n");
         return 0;
     }
 
     orig_offset = uio_offset(uio);
     if (orig_offset < 0) {
+        IOLog("osxfuse: Return EINVAL [6]\n");
         return EINVAL;
     }
 
     fvdat = VTOFUD(vp);
     if (!fvdat) {
+        IOLog("osxfuse: Return EINVAL [7]\n");
         return EINVAL;
     }
 
@@ -2679,6 +2710,7 @@ fuse_vnop_read(struct vnop_read_args *ap)
 #if M_OSXFUSE_ENABLE_BIG_LOCK
         fuse_biglock_lock(data->biglock);
 #endif
+        IOLog("osxfuse: Return res(%d) [8]\n", res);
         return res;
     }
 
@@ -2695,6 +2727,7 @@ fuse_vnop_read(struct vnop_read_args *ap)
             fufh_type = FUFH_RDWR;
             fufh = &(fvdat->fufh[fufh_type]);
             if (!FUFH_IS_VALID(fufh)) {
+                IOLog("osxfuse: !FUFH_IS_VALID(fufh = %llu)\n", fufh->fh_id);
                 fufh = NULL;
             } else {
                 /* Read falling back to FUFH_RDWR. */
@@ -2703,6 +2736,7 @@ fuse_vnop_read(struct vnop_read_args *ap)
 
         if (!fufh) {
             /* Failing direct I/O because of no fufh. */
+            IOLog("osxfuse: Return EIO [9]\n");
             return EIO;
         } else {
             /* Using existing fufh of type fufh_type. */
@@ -2749,6 +2783,7 @@ fuse_vnop_read(struct vnop_read_args *ap)
 
     } /* direct_io */
 
+    IOLog("osxfuse: Return 0 or err(%d) [10]\n", err);
     return ((err == -1) ? 0 : err);
 }
 
@@ -3758,7 +3793,7 @@ fuse_vnop_write(struct vnop_write_args *ap)
 
     fuse_trace_printf_vnop();
 
-    if (fuse_isdeadfs(vp)) {
+    if (fuse_isdeadfs(vp) && !vnode_isinuse(vp, 0)) {
         return ENXIO;
     }
 
