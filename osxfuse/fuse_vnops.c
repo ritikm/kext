@@ -797,7 +797,6 @@ fuse_vnop_getattr(struct vnop_getattr_args *ap)
     if (!(dataflags & FSESS_INITED) && !vnode_isvroot(vp)) {
         fdata_set_dead(data, false);
         err = ENOTCONN;
-        IOLog("osxfuse: Returning err: %d", err);
         return err;
     }
 
@@ -807,19 +806,6 @@ fuse_vnop_getattr(struct vnop_getattr_args *ap)
      * locate that file by name and fstat(2) would fail. But if we passed an
      * open file handle and FGETATTR was implemented by the daemon, the call
      * might succeed.
-     *
-     * We could do something like this:
-     *
-     * struct fuse_filehandle *fufh;
-     * int type;
-     * for (type = 0; type < FUFH_MAXTYPE; type++) {
-     *     fufh = &(fvdat->fufh[type]);
-     *     if (FUFH_IS_VALID(fufh)) {
-     *         fgi->getattr_flags = FUSE_GETATTR_FH;
-     *         fgi->fh = fufh->fh_id;
-     *         break;
-     *     }
-     * }
      *
      * But by doing so, we would not get an ENOENT error in case the file does
      * no longer exist (under its original name) for as long as its vnode is in
@@ -833,7 +819,6 @@ fuse_vnop_getattr(struct vnop_getattr_args *ap)
         fufh = &(fvdat->fufh[type]);
         if (FUFH_IS_VALID(fufh)) {
             found_valid_fh = true;
-            IOLog("osxfuse: fufh(%llu) is valid\n", fufh->fh_id);
             break;
         }
     }
@@ -844,11 +829,9 @@ fuse_vnop_getattr(struct vnop_getattr_args *ap)
     fuse_abi_data_init(&fgi, DATOI(data), fdi.indata);
 
     if (found_valid_fh) {
-        IOLog("osxfuse: setting flags to call fgetattr\n");
         fuse_getattr_in_set_fh(&fgi, fufh->fh_id);
         fuse_getattr_in_set_getattr_flags(&fgi, FUSE_GETATTR_FH);
     } else {
-        IOLog("osxfuse: setting flags to call regular getattr\n");
         fuse_getattr_in_set_fh(&fgi, 0);
         fuse_getattr_in_set_getattr_flags(&fgi, 0);
     }
@@ -878,7 +861,6 @@ fuse_vnop_getattr(struct vnop_getattr_args *ap)
 
     if ((fuse_attr_get_mode(&fa) & S_IFMT) == 0) {
         fuse_ticket_release(fdi.tick);
-        IOLog("osxfuse: EIO because of bad va_mode\n");
         return EIO;
     }
 
@@ -936,7 +918,6 @@ fuse_vnop_getattr(struct vnop_getattr_args *ap)
 #if M_OSXFUSE_ENABLE_BIG_LOCK
             fuse_biglock_lock(data->biglock);
 #endif
-            IOLog("osxfuse: EIO because of stale vnode\n");
             return EIO;
         }
     }
