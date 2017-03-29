@@ -225,7 +225,6 @@
 				TargetAttributes = {
 					4332BEA71D108F4000F84D51 = {
 						CreatedOnToolsVersion = 8.0;
-						DevelopmentTeam = M683GB7CPW;
 						ProvisioningStyle = Manual;
 					};
 				};
@@ -390,8 +389,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CLANG_WARN_DOCUMENTATION_COMMENTS = NO;
-				CODE_SIGN_IDENTITY = "Mac Developer";
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Mac Developer";
+				CODE_SIGN_IDENTITY = "Developer ID";
 				DWARF_DSYM_FOLDER_PATH = "$(CONFIGURATION_BUILD_DIR)/Debug";
 				GCC_TREAT_WARNINGS_AS_ERRORS = YES;
 				INFOPLIST_FILE = osxfuse/Info.plist;
@@ -405,7 +403,6 @@
 				OTHER_CODE_SIGN_FLAGS = "--identifier $(MODULE_NAME)";
 				PRODUCT_BUNDLE_IDENTIFIER = com.github.osxfuse.osxfuse;
 				PRODUCT_NAME = "$(OSXFUSE_NAME)";
-				PROVISIONING_PROFILE = "";
 				"VALID_ARCHS[sdk=macosx10.10]" = x86_64;
 				"VALID_ARCHS[sdk=macosx10.11]" = x86_64;
 				"VALID_ARCHS[sdk=macosx10.12]" = x86_64;
@@ -422,8 +419,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CLANG_WARN_DOCUMENTATION_COMMENTS = NO;
-				CODE_SIGN_IDENTITY = "Mac Developer";
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Mac Developer";
+				CODE_SIGN_IDENTITY = "Developer ID";
 				COPY_PHASE_STRIP = YES;
 				DEPLOYMENT_POSTPROCESSING = YES;
 				DWARF_DSYM_FOLDER_PATH = "$(CONFIGURATION_BUILD_DIR)/Debug";
@@ -440,7 +436,6 @@
 				OTHER_CODE_SIGN_FLAGS = "--identifier $(MODULE_NAME)";
 				PRODUCT_BUNDLE_IDENTIFIER = com.github.osxfuse.osxfuse;
 				PRODUCT_NAME = "$(OSXFUSE_NAME)";
-				PROVISIONING_PROFILE = "";
 				SEPARATE_STRIP = YES;
 				STRIP_STYLE = "non-global";
 				"VALID_ARCHS[sdk=macosx10.10]" = x86_64;
